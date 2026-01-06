@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <title>Slot Machine</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="slot">
+    <div class="top">
+        <div>Credit: <span id="credit">100</span></div>
+        <div>Bet: <span id="bet">5</span></div>
+    </div>
+
+    <div class="controls">
+        <button id="betMinus">-</button>
+        <button id="betPlus">+</button>
+        <button id="addCredit">Add Credit</button>
+    </div>
+
+    <div class="reels" id="reels"></div>
+
+    <button class="spin-btn" id="spinBtn">SPIN</button>
+
+    <div class="result" id="result"></div>
+    <svg class="lines" viewBox="0 0 500 180"></svg>
+    </div>
+
+<audio id="spinSound" src="spin.mp3"></audio>
+<audio id="winSound" src="win.mp3"></audio>
+<audio id="stopSound" src="stop.mp3"></audio>
+
+<script src="game.js"></script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+body {
+    margin: 0;
+    height: 100vh;
+    background: radial-gradient(circle, #222, #000);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: Arial, sans-serif;
+    color: #fff;
+}
+
+.slot {
+    background: linear-gradient(#2a2a2a, #111);
+    padding: 20px;
+    position: relative;
+    border-radius: 14px;
+    width: 560px;
+    box-shadow: 0 20px 40px rgba(0,0,0,.6);
+}
+
+.top {
+    display: flex;
+    justify-content: space-between;
+}
+
+.controls {
+    display: flex;
+    gap: 10px;
+    margin: 10px 0;
+}
+
+button {
+    padding: 8px 14px;
+    font-size: 14px;
+    cursor: pointer;
+    background: #444;
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+}
+
+button:hover {
+    background: #666;
+}
+
+.spin-btn {
+    width: 100%;
+    margin-top: 10px;
+    font-size: 18px;
+    background: #c0392b;
+}
+
+.reels {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin: 15px 0;
+}
+
+.reel {
+    width: 80px;
+    height: 180px;
+    overflow: hidden;
+    background: #000;
+    border-radius: 8px;
+    border: 2px solid #555;
+    position: relative;
+}
+
+.strip {
+    position: absolute;
+    width: 100%;
+    will-change: transform;
+}
+
+.symbol {
+    height: 60px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 40px;
+}.lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.line {
+  stroke: gold;
+  stroke-width: 4;
+  fill: none;
+  stroke-dasharray: 200;
+  animation: draw 0.5s linear forwards;
+}
+
+@keyframes draw {
+  from { stroke-dashoffset: 200; }
+  to { stroke-dashoffset: 0; }
+}
