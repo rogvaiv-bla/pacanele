@@ -3,34 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <title>Slot Machine</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=2">
+    <style>
+        .reels {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            justify-content: center;
+            gap: 20px;
+            margin: 15px 0;
+        }
+    </style>
 </head>
 <body>
 
 <div class="slot">
+    <h1>SLOT MACHINE</h1>
     <div class="top">
         <div>Credit: <span id="credit">100</span></div>
         <div>Bet: <span id="bet">5</span></div>
     </div>
 
-    <div class="controls">
-        <button id="betMinus">-</button>
-        <button id="betPlus">+</button>
-        <button id="addCredit">Add Credit</button>
-    </div>
-
     <div class="reels" id="reels"></div>
 
-    <button class="spin-btn" id="spinBtn">SPIN</button>
+    <svg class="lines" viewBox="0 0 510 180"></svg>
 
+    <div class="bottom-controls">
+        <div class="controls">
+            <button id="betMinus">➖</button>
+            <button id="betPlus">➕</button>
+            <button id="addCredit">💰</button>
+        </div>
+        <button class="spin-btn" id="spinBtn">🎰 SPIN</button>
+    </div>
     <div class="result" id="result"></div>
-    <svg class="lines" viewBox="0 0 500 180"></svg>
     </div>
 
 <audio id="spinSound" src="spin.mp3"></audio>
 <audio id="winSound" src="win.mp3"></audio>
 <audio id="stopSound" src="stop.mp3"></audio>
 
-<script src="game.js"></script>
+<script src="engine.js"></script>
+<script src="renderer.js"></script>
 </body>
 </html>

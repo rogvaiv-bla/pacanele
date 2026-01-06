@@ -1,20 +1,26 @@
+/* Renderer: DOM + gameplay glue for Slot Machine.
+   This file is derived from game.js and expects `window.paytable`, `window.symbolWeights`, and `SlotEngine` (optional) to be available.
+*/
+
+// Copied from game.js (renderer portion)
+
 /* =========================
    CONFIGURARE DE BAZĂ
 ========================= */
 
-// Engine moved to `engine.js` (SlotEngine). If it's not present, fall back to inline defaults.
-const enginePresent = typeof SlotEngine !== "undefined";
-const symbols = enginePresent ? Object.keys(SlotEngine ? SlotEngine.normalizeWeights ? SlotEngine.normalizeWeights({}) : {} : {}) : ["🍒", "🍋", "🍊", "⭐", "🔔", "💎"];
+const reelCount = 5;
+const visibleRows = 3;
+const symbolHeight = 60;
 
 // Note: core paytable/weights are defined in engine.js; renderer will use them when available.
 // Provide default/global paytable and weights so the engine utilities can compute RTP.
 const defaultSymbolWeights = {
-    "🍒": 20,
+    "🍒": 10,
     "🍋": 20,
     "🍊": 20,
     "⭐": 15,
     "🔔": 15,
-    "💎": 10
+    "💎": 20
 };
 
 const defaultPaytable = {
@@ -38,9 +44,8 @@ window.symbolWeights = window.symbolWeights || defaultSymbolWeights;
 window.paytable = window.paytable || defaultPaytable;
 window.paylines = window.paylines || defaultPaylines;
 
-const reelCount = 5;
-const visibleRows = 3;
-const symbolHeight = 60;
+// symbols list derived from current symbolWeights
+const symbols = Object.keys(window.symbolWeights || {"🍒":1,"🍋":1,"🍊":1,"⭐":1,"🔔":1,"💎":1});
 
 /* =========================
     CONFIGURARI AVANSATE
@@ -79,7 +84,7 @@ const betMinusBtn = document.getElementById("betMinus");
 const addCreditBtn = document.getElementById("addCredit");
 
 if (!reelsContainer || !creditEl || !betEl || !resultEl || !spinBtn) {
-    console.error("game.js: missing required DOM elements (#reels, #credit, #bet, #result, #spinBtn)");
+    console.error("renderer.js: missing required DOM elements (#reels, #credit, #bet, #result, #spinBtn)");
 }
 
 /* =========================
@@ -94,8 +99,60 @@ function weightedRandomSymbol() {
     for (const [symbol, weight] of entries) {
         if ((r -= weight) <= 0) return symbol;
     }
-    // fallback (shouldn't happen) - return last symbol from default symbol list
     return (entries[entries.length - 1] && entries[entries.length - 1][0]) || "🍒";
+}
+
+/* =========================
+   SUNETE
+========================= */
+
+let audioContext;
+
+function initAudio() {
+    if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+}
+
+function playTone(frequency, duration, type = 'sine', volume = 0.1) {
+    initAudio();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.frequency.value = frequency;
+    oscillator.type = type;
+
+    gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + duration);
+}
+
+function playSpinSound() {
+    // Rapid beeps for spinning
+    for (let i = 0; i < 15; i++) {
+        setTimeout(() => playTone(800 + i * 30, 0.1, 'square', 0.05), i * 120);
+    }
+}
+
+function playStopSound() {
+    playTone(600, 0.3, 'sawtooth', 0.1);
+}
+
+function playWinSound() {
+    // Winning melody
+    const notes = [523, 659, 784, 1047]; // C, E, G, C
+    notes.forEach((freq, i) => {
+        setTimeout(() => playTone(freq, 0.4, 'sine', 0.15), i * 200);
+    });
+}
+
+function playTumbleSound() {
+    playTone(400, 0.2, 'triangle', 0.1);
 }
 
 /* =========================
@@ -105,6 +162,7 @@ function weightedRandomSymbol() {
 function updateUI() {
     creditEl.textContent = credit;
     betEl.textContent = bet;
+    if (spinBtn) spinBtn.textContent = '🎰 SPIN';
 }
 
 /* =========================
@@ -137,10 +195,6 @@ for (let i = 0; i < reelCount; i++) {
    SPIN
 ========================= */
 
-const spinAudio = document.getElementById("spinSound");
-const winAudio = document.getElementById("winSound");
-const stopAudio = document.getElementById("stopSound");
-
 function spin() {
     if (spinning || credit < bet) return;
 
@@ -150,10 +204,7 @@ function spin() {
     resultEl.textContent = "";
     if (linesSvg) linesSvg.innerHTML = "";
 
-    if (spinAudio) {
-        spinAudio.currentTime = 0;
-        spinAudio.play().catch(() => {});
-    }
+    playSpinSound();
 
     const reels = document.querySelectorAll(".reel");
 
@@ -180,11 +231,8 @@ function spin() {
                 "transform 1.3s cubic-bezier(.08,.6,.1,1)";
             strip.style.transform = `translateY(${offset}px)`;
 
-            // sunet la oprire rolă (ultimul)
-            if (index === reels.length - 1 && stopAudio) {
-                stopAudio.currentTime = 0;
-                stopAudio.play().catch(() => {});
-            }
+            // Play stop sound when this reel finishes transitioning
+            setTimeout(() => playStopSound(), 1300);
         }, index * 150);
 
         if (index === reels.length - 1) {
@@ -192,8 +240,9 @@ function spin() {
         }
     });
 }
+
 function endSpin() {
-    // Called when reels stop. Resolve game logic: near-miss, tumble, bonus, free spins.
+    // Called when reels stop. Resolve game logic: near-miss, tumble.
     spinning = false;
     enterState("resolving");
 
@@ -203,11 +252,13 @@ function endSpin() {
     // resolve cascades and accumulate win
     const accumulated = resolveTumbles(bet, info => {
         // optional per-step callback for UI/analytics
-        // console.log('tumble step', info);
     });
 
     if (accumulated > 0) {
         resultEl.textContent = `Câștig total: ${accumulated}`;
+        const slot = document.querySelector('.slot');
+        slot.classList.add('winning');
+        setTimeout(() => slot.classList.remove('winning'), 3000);
     } else {
         resultEl.textContent = "Fără câștig";
     }
@@ -299,7 +350,7 @@ function calculatePayout(grid, currentBet) {
     let total = 0;
     const wins = [];
 
-    paylines.forEach((line, idx) => {
+    (window.paylines || []).forEach((line, idx) => {
         const res = evaluatePayline(grid, line);
         if (res) {
             // Apply volatility multiplier to payout value
@@ -332,8 +383,10 @@ function resolveTumbles(currentBet, onStep) {
             updateUI();
 
             // visual + audio feedback for this tumble
-            if (wins.length) animateWinningLines(wins.map(w => ({ line: w.line })));
-            playWinAudioDynamic(total);
+            if (wins.length) {
+                animateWinningLines(wins.map(w => ({ line: w.line })));
+                playWinSound();
+            }
 
             if (typeof onStep === "function") onStep({ iteration: ++iteration, wins, total, accumulated });
 
@@ -347,6 +400,8 @@ function resolveTumbles(currentBet, onStep) {
                     }
                 });
             });
+
+            playTumbleSound();
 
             // slight bias to converge RTP: if we've paid out too much relative to theoretical RTP, reduce future big symbols
             if (typeof window.paytable !== 'undefined' && Math.random() > 0.95) {
@@ -372,8 +427,8 @@ function applyNearMissIfNeeded() {
     const { total } = calculatePayout(grid, bet);
     if (total === 0 && Math.random() < nearMissFrequency) {
         // pick a random payline and attempt to craft a near-miss: 2 matching symbols + 1 different
-        const lineIndex = Math.floor(Math.random() * paylines.length);
-        const line = paylines[lineIndex];
+        const lineIndex = Math.floor(Math.random() * (window.paylines || []).length);
+        const line = (window.paylines || [])[lineIndex] || [1,1,1,1,1];
         const els = getVisibleSymbolElements();
 
         // pick a symbol to almost match (avoid highest jackpot)
@@ -391,18 +446,6 @@ function applyNearMissIfNeeded() {
         // tiny feedback
         if (resultEl) resultEl.textContent = "Near miss..."
     }
-}
-
-// Bonus spins removed — feature deprecated.
-
-function playWinAudioDynamic(amount) {
-    if (!winAudio) return;
-    // scale playbackRate and volume with win size
-    const rate = Math.min(2.0, 1 + Math.log10(Math.max(1, amount)) / 2);
-    winAudio.playbackRate = rate;
-    winAudio.volume = Math.min(1, 0.3 + Math.log10(Math.max(1, amount)) / 3);
-    winAudio.currentTime = 0;
-    winAudio.play().catch(() => {});
 }
 
 /* =========================
